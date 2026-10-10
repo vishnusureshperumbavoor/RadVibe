@@ -120,18 +120,6 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
         <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#000000aa', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', color: '#38bdf8', border: '1px solid #38bdf833' }}>
           Format: DICOM (.dcm) | {dicomMeta ? `${dicomMeta.columns}x${dicomMeta.rows}` : '512x512'} | {dicomMeta ? `${dicomMeta.fileSizeKB}KB` : ''}
         </div>
-
-        {/* Direct Link to Raw DICOM Endpoint */}
-        {selectedCase.dicomUrl && (
-          <a 
-            href={selectedCase.dicomUrl} 
-            target="_blank" 
-            rel="noreferrer"
-            style={{ position: 'absolute', bottom: '8px', right: '8px', background: '#2563ebaa', padding: '4px 8px', borderRadius: '4px', fontSize: '10px', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
-          >
-            <Download size={10} /> Raw .dcm
-          </a>
-        )}
       </div>
 
       {/* Parsed DICOM Header Metadata Box */}

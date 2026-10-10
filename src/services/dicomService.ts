@@ -42,7 +42,7 @@ export class DicomService {
   }
 
   /**
-   * Render raw DICOM Int16 pixel array to HTML5 Canvas
+   * Render raw DICOM Int16 pixel array to HTML5 Canvas with proper Medical Window Center & Window Width
    */
   static renderToCanvas(canvas: HTMLCanvasElement, byteArray: Uint8Array, meta: ParsedDicomMeta, lesionSizeMm: number = 18.5, showOverlay: boolean = false) {
     const ctx = canvas.getContext('2d');
@@ -59,25 +59,43 @@ export class DicomService {
     
     const pixelView = new Int16Array(byteArray.buffer, pixelOffset, width * height);
 
-    let minPixel = 32767;
-    let maxPixel = -32768;
-    for (let i = 0; i < pixelView.length; i++) {
+    // Filter out extreme background padded values (e.g. -1000 or -2000) for medical windowing
+    const validPixels: number[] = [];
+    for (let i = 0; i < pixelView.length; i += 4) { // sample every 4th pixel for speed
       const val = pixelView[i];
-      if (val < minPixel) minPixel = val;
-      if (val > maxPixel) maxPixel = val;
+      if (val > -500 && val < 4000) {
+        validPixels.push(val);
+      }
     }
 
-    const range = maxPixel - minPixel || 1;
+    validPixels.sort((a, b) => a - b);
+    const p5 = validPixels[Math.floor(validPixels.length * 0.05)] || 0;
+    const p95 = validPixels[Math.floor(validPixels.length * 0.95)] || 1000;
+
+    // Standard medical Window Center (WC) and Window Width (WW)
+    const windowWidth = Math.max(p95 - p5, 100);
+    const windowCenter = p5 + windowWidth / 2;
+
+    const minWindow = windowCenter - windowWidth / 2;
+    const maxWindow = windowCenter + windowWidth / 2;
 
     for (let i = 0; i < pixelView.length; i++) {
       const pixelVal = pixelView[i];
-      const normalized = Math.floor(((pixelVal - minPixel) / range) * 255);
+      
+      let intensity = 0;
+      if (pixelVal <= minWindow) {
+        intensity = 0;
+      } else if (pixelVal >= maxWindow) {
+        intensity = 255;
+      } else {
+        intensity = Math.floor(((pixelVal - minWindow) / windowWidth) * 255);
+      }
 
       const idx = i * 4;
-      imgData.data[idx] = normalized;     // Red
-      imgData.data[idx + 1] = normalized; // Green
-      imgData.data[idx + 2] = normalized; // Blue
-      imgData.data[idx + 3] = 255;        // Alpha
+      imgData.data[idx] = intensity;     // Red
+      imgData.data[idx + 1] = intensity; // Green
+      imgData.data[idx + 2] = intensity; // Blue
+      imgData.data[idx + 3] = 255;       // Alpha
     }
 
     ctx.putImageData(imgData, 0, 0);
