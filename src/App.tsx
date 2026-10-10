@@ -115,9 +115,9 @@ export default function App() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              RadVibe <span style={{ fontSize: '11px', background: '#7c3aed22', color: '#c084fc', padding: '2px 8px', borderRadius: '12px', border: '1px solid #7c3aed44' }}>Agent Swarm & Persistent Storage</span>
+              RadVibe <span style={{ fontSize: '11px', background: '#7c3aed22', color: '#c084fc', padding: '2px 8px', borderRadius: '12px', border: '1px solid #7c3aed44' }}>Agent Swarm</span>
             </h1>
-            <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Multi-Dataset Autonomous Swarm Analysis & Persistent Browser Storage</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Multi-Dataset Autonomous Radiology Agent Swarm Engine via RouterPlus</p>
           </div>
         </div>
 

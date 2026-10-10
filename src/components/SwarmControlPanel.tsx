@@ -23,10 +23,10 @@ export const SwarmControlPanel: React.FC<SwarmControlPanelProps> = ({
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h3 style={{ margin: 0, fontSize: '15px', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Users size={18} /> Autonomous Agent Swarm & Persistence
+          <Users size={18} /> Autonomous Agent Swarm
         </h3>
         <span style={{ fontSize: '11px', background: '#3b82f622', color: '#60a5fa', padding: '3px 8px', borderRadius: '12px', border: '1px solid #3b82f644' }}>
-          {savedReports.length} Reports Saved (Survives Refresh)
+          {savedReports.length} Active Swarm Reports
         </span>
       </div>
 

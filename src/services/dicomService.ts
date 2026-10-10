@@ -100,8 +100,8 @@ export class DicomService {
 
     ctx.putImageData(imgData, 0, 0);
 
-    // Draw AI Agent ROI measurement lines ONLY when agent has completed analysis
-    if (showOverlay) {
+    // Draw AI Agent ROI measurement lines ONLY when showOverlay is explicitly true
+    if (showOverlay === true) {
       ctx.strokeStyle = '#facc15';
       ctx.lineWidth = 3;
       ctx.beginPath();
