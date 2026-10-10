@@ -44,7 +44,7 @@ export class DicomService {
   /**
    * Render raw DICOM Int16 pixel array to HTML5 Canvas
    */
-  static renderToCanvas(canvas: HTMLCanvasElement, byteArray: Uint8Array, meta: ParsedDicomMeta, lesionSizeMm: number = 18.5) {
+  static renderToCanvas(canvas: HTMLCanvasElement, byteArray: Uint8Array, meta: ParsedDicomMeta, lesionSizeMm: number = 18.5, showOverlay: boolean = false) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -82,18 +82,20 @@ export class DicomService {
 
     ctx.putImageData(imgData, 0, 0);
 
-    // Overlay AI Agent ROI measurement lines over DICOM Canvas
-    ctx.strokeStyle = '#facc15';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(width * 0.35, height * 0.45);
-    ctx.lineTo(width * 0.65, height * 0.45);
-    ctx.stroke();
+    // Draw AI Agent ROI measurement lines ONLY when agent has completed analysis
+    if (showOverlay) {
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(width * 0.35, height * 0.45);
+      ctx.lineTo(width * 0.65, height * 0.45);
+      ctx.stroke();
 
-    ctx.fillStyle = '#000000aa';
-    ctx.fillRect(width * 0.35, height * 0.40, 160, 24);
-    ctx.fillStyle = '#facc15';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(`ROI Lesion: ${lesionSizeMm}mm`, width * 0.37, height * 0.44);
+      ctx.fillStyle = '#000000aa';
+      ctx.fillRect(width * 0.35, height * 0.40, 160, 24);
+      ctx.fillStyle = '#facc15';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`ROI Lesion: ${lesionSizeMm}mm`, width * 0.37, height * 0.44);
+    }
   }
 }

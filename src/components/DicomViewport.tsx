@@ -9,6 +9,7 @@ interface DicomViewportProps {
   dicomMeta: ParsedDicomMeta | null;
   fetchingDicom: boolean;
   agentRunning: boolean;
+  hasAnalyzed: boolean;
   onSelectCase: (c: DicomCase) => void;
   onCustomUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRunAgent: () => void;
@@ -20,13 +21,14 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
   dicomMeta,
   fetchingDicom,
   agentRunning,
+  hasAnalyzed,
   onSelectCase,
   onCustomUpload,
   onRunAgent
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Re-render DICOM canvas when selectedCase or dicomMeta updates
+  // Re-render DICOM canvas when selectedCase, dicomMeta, or hasAnalyzed updates
   useEffect(() => {
     let isMounted = true;
 
@@ -35,7 +37,7 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
         try {
           const { byteArray, meta } = await DicomService.fetchAndParse(selectedCase.dicomUrl, selectedCase.modality, selectedCase.region);
           if (isMounted && canvasRef.current) {
-            DicomService.renderToCanvas(canvasRef.current, byteArray, meta, selectedCase.measurements.lesion_size_mm || 18.5);
+            DicomService.renderToCanvas(canvasRef.current, byteArray, meta, selectedCase.measurements.lesion_size_mm || 18.5, hasAnalyzed);
           }
         } catch (err) {
           console.error('Viewport render error:', err);
@@ -46,7 +48,7 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
     load();
 
     return () => { isMounted = false; };
-  }, [selectedCase]);
+  }, [selectedCase, hasAnalyzed]);
 
   return (
     <section style={{ background: '#111827', borderRadius: '12px', border: '1px solid #1f2937', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>

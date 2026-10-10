@@ -134,6 +134,7 @@ export default function App() {
           dicomMeta={dicomMeta}
           fetchingDicom={fetchingDicom}
           agentRunning={agentRunning}
+          hasAnalyzed={!!clinicalReport}
           onSelectCase={(c) => setSelectedCase(c)}
           onCustomUpload={handleCustomDicomUpload}
           onRunAgent={() => runAgent(apiKey, selectedModel, selectedCase, dicomMeta)}
