@@ -13,12 +13,12 @@ const ORTHANC_BASE = 'https://orthanc.uclouvain.be/demo';
 const DICOM_CASES = [
   {
     id: 'orthanc-brain-dcm',
-    title: '🧠 Brain DICOM (.dcm) - Orthanc PACS',
-    source: 'Live Orthanc PACS',
+    title: '🧠 Brain DICOM (.dcm)',
+    source: 'Local DICOM Asset',
     modality: 'MRI',
     region: 'Brain',
-    instanceId: '021587a8-3b4629df-96455d78-79c4df7b-1ea4714e',
-    dicomUrl: `${ORTHANC_BASE}/instances/021587a8-3b4629df-96455d78-79c4df7b-1ea4714e/file`,
+    instanceId: 'brain-01',
+    dicomUrl: '/dicom/brain.dcm',
     measurements: {
       location: 'Left Middle Cerebral Artery (MCA) Territory',
       lesion_size_mm: 18.5,
@@ -29,12 +29,12 @@ const DICOM_CASES = [
   },
   {
     id: 'orthanc-chest-dcm',
-    title: '🫁 Chest CT DICOM (.dcm) - Orthanc PACS',
-    source: 'Live Orthanc PACS',
+    title: '🫁 Chest CT DICOM (.dcm)',
+    source: 'Local DICOM Asset',
     modality: 'CT',
     region: 'Chest',
-    instanceId: '02367bc6-9a6fd565-29c521f7-f46f10eb-99b7523a',
-    dicomUrl: `${ORTHANC_BASE}/instances/02367bc6-9a6fd565-29c521f7-f46f10eb-99b7523a/file`,
+    instanceId: 'chest-01',
+    dicomUrl: '/dicom/chest.dcm',
     measurements: {
       location: 'Right Upper Lobe Subpleural Region',
       nodule_diameter_mm: 12.8,
@@ -45,12 +45,12 @@ const DICOM_CASES = [
   },
   {
     id: 'orthanc-spine-dcm',
-    title: '🦴 Spine MRI DICOM (.dcm) - Orthanc PACS',
-    source: 'Live Orthanc PACS',
+    title: '🦴 Spine MRI DICOM (.dcm)',
+    source: 'Local DICOM Asset',
     modality: 'MRI',
     region: 'Spine',
-    instanceId: '02d0fdd3-db518ddd-b90625dc-926f3ebc-d0c327fc',
-    dicomUrl: `${ORTHANC_BASE}/instances/02d0fdd3-db518ddd-b90625dc-926f3ebc-d0c327fc/file`,
+    instanceId: 'spine-01',
+    dicomUrl: '/dicom/spine.dcm',
     measurements: {
       location: 'L4-L5 Intervertebral Disc Level',
       disc_height_mm: 4.2,
@@ -261,14 +261,29 @@ export default function App() {
     addLog('ACTION: routerplus_llm_synthesize()', `Dispatching DICOM analysis to RouterPlus Gateway (${selectedModel})...`, 'pending');
 
     try {
-      const systemPrompt = `You are RadVibe, an Autonomous Expert Radiology AI Agent. 
+      const systemPrompt = `You are RadVibe, an Autonomous Board-Certified Radiology AI Agent.
 You are analyzing a raw DICOM scan file (${selectedCase.modality} of ${selectedCase.region}).
 Extracted DICOM Header Tags: ${JSON.stringify(dicomMeta)}.
 Quantitative Measurements: ${JSON.stringify(selectedCase.measurements)}.
 
-Format your response as a valid JSON object with two top-level keys:
-1. "radiology_report": A formal clinical Radiology Report (Findings with exact mm measurements, Impression, ICD-10 codes, Recommendations).
-2. "patient_explain_eli5": An "Explain Like I'm 5" summary for the patient (Plain English breakdown, What this means, Questions to ask your doctor).`;
+Generate a formal hospital Radiology Consultation Report.
+DO NOT use markdown hashtags (like ### or ##). 
+Use uppercase bold headers for each section:
+
+**CLINICAL HISTORY & TECHNIQUE**
+State patient modality, region, and acquisition protocol.
+
+**FINDINGS**
+Provide itemized anatomical findings, lesion diameter in mm, attenuation (HU), and signal characteristics.
+
+**IMPRESSION**
+Primary clinical diagnostic impression.
+
+**ICD-10 CODES**
+List 2-3 relevant ICD-10 diagnostic codes.
+
+**RECOMMENDATIONS**
+Next diagnostic steps, follow-up imaging, or specialist referrals.`;
 
       const res = await fetch('https://api.routerplus.com/v1/chat/completions', {
         method: 'POST',
@@ -291,13 +306,16 @@ Format your response as a valid JSON object with two top-level keys:
       const rawContent = data.choices?.[0]?.message?.content || '';
       addLog('OBSERVATION', 'RouterPlus LLM synthesis completed cleanly.', 'success');
 
-      try {
-        const parsed = JSON.parse(rawContent.replace(/```json|```/g, '').trim());
-        setClinicalReport(parsed.radiology_report || rawContent);
-        setPatientELI5(parsed.patient_explain_eli5 || rawContent);
-      } catch {
-        setClinicalReport(rawContent);
-        setPatientELI5(`### 🧑‍🤝‍🧑 Patient Summary\n\n${rawContent}`);
+      // Clean out markdown code block wrappers if model returns them
+      const cleanContent = rawContent.replace(/```markdown|```json|```/g, '').trim();
+      const parts = cleanContent.split('---');
+
+      if (parts.length >= 2) {
+        setClinicalReport(parts[0].trim());
+        setPatientELI5(parts.slice(1).join('---').trim());
+      } else {
+        setClinicalReport(cleanContent);
+        setPatientELI5(cleanContent);
       }
 
     } catch (err: any) {
@@ -505,72 +523,98 @@ Format your response as a valid JSON object with two top-level keys:
             </div>
           </div>
 
-          {/* Output Perspective Tabs */}
-          <div style={{ background: '#111827', borderRadius: '12px', border: '1px solid #1f2937', padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* Official Hospital EHR Radiology Document */}
+          <div style={{ background: '#111827', borderRadius: '12px', border: '1px solid #1f2937', padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
-            <div style={{ display: 'flex', borderBottom: '1px solid #1f2937', marginBottom: '16px', gap: '12px' }}>
-              <button
-                onClick={() => setActiveTab('doctor')}
-                style={{
-                  padding: '10px 16px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeTab === 'doctor' ? '2px solid #2563eb' : '2px solid transparent',
-                  color: activeTab === 'doctor' ? '#38bdf8' : '#94a3b8',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <Stethoscope size={16} /> 🩺 Doctor View (Formal Radiology Report)
-              </button>
-
-              <button
-                onClick={() => setActiveTab('patient')}
-                style={{
-                  padding: '10px 16px',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: activeTab === 'patient' ? '2px solid #7c3aed' : '2px solid transparent',
-                  color: activeTab === 'patient' ? '#c084fc' : '#94a3b8',
-                  fontWeight: 600,
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <UserCheck size={16} /> 🧑‍🤝‍🧑 Patient View (ELI5 Explanation)
-              </button>
+            {/* Hospital / Clinic Document Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #1e293b', pb: '16px', paddingBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', color: '#f8fafc', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Stethoscope size={20} color="#38bdf8" /> RADIOLOGY CONSULTATION REPORT
+                </h3>
+                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>DEPARTMENT OF DIAGNOSTIC & MOLECULAR IMAGING</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '11px', background: '#0369a133', color: '#38bdf8', padding: '4px 12px', borderRadius: '12px', border: '1px solid #0284c744', fontWeight: 700 }}>
+                  VERIFIED BY RADVIBE AI
+                </span>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>STATUS: FINAL CLINICAL REPORT</div>
+              </div>
             </div>
 
-            {/* Tab Output Content */}
-            <div style={{ flex: 1, background: '#020617', padding: '16px', borderRadius: '8px', border: '1px solid #1e293b', overflowY: 'auto', minHeight: '300px' }}>
-              {activeTab === 'doctor' ? (
-                <div>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#38bdf8' }}>Formal Clinical Radiology Report</h4>
-                  {clinicalReport ? (
-                    <pre style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', fontFamily: 'system-ui, sans-serif', fontSize: '13px', lineHeight: '1.6' }}>
-                      {clinicalReport}
-                    </pre>
+            {/* Patient & Exam Metadata Banner */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', background: '#020617', padding: '14px', borderRadius: '8px', border: '1px solid #1e293b', fontSize: '12px' }}>
+              <div>
+                <div style={{ color: '#64748b', fontWeight: 600, fontSize: '10px' }}>PATIENT NAME</div>
+                <div style={{ color: '#f8fafc', fontWeight: 700 }}>{dicomMeta?.patientName || 'PHENIX^PATIENT'}</div>
+              </div>
+              <div>
+                <div style={{ color: '#64748b', fontWeight: 600, fontSize: '10px' }}>MODALITY / EXAM</div>
+                <div style={{ color: '#38bdf8', fontWeight: 700 }}>{selectedCase.modality} - {selectedCase.region}</div>
+              </div>
+              <div>
+                <div style={{ color: '#64748b', fontWeight: 600, fontSize: '10px' }}>TRANSFER SYNTAX</div>
+                <div style={{ color: '#a78bfa', fontWeight: 700 }}>{dicomMeta?.transferSyntaxUID || '1.2.840.10008.1.2.1'}</div>
+              </div>
+              <div>
+                <div style={{ color: '#64748b', fontWeight: 600, fontSize: '10px' }}>MATRIX SIZE</div>
+                <div style={{ color: '#f8fafc', fontWeight: 700 }}>{dicomMeta ? `${dicomMeta.columns} x ${dicomMeta.rows}` : '512 x 512'}</div>
+              </div>
+            </div>
+
+            {/* Main Report Body */}
+            <div style={{ flex: 1, background: '#020617', padding: '20px', borderRadius: '8px', border: '1px solid #1e293b', overflowY: 'auto', minHeight: '300px' }}>
+              {clinicalReport ? (
+                <div style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: '1.8' }}>
+                  {typeof clinicalReport === 'string' ? (
+                    clinicalReport
+                      .split('\n')
+                      .map((line, idx) => {
+                        const trimmed = line.trim();
+                        if (!trimmed) return <div key={idx} style={{ height: '8px' }} />;
+
+                        // Header line (e.g. **CLINICAL HISTORY** or CLINICAL HISTORY)
+                        const isHeader = /^(\*\*|\#\#\#?\s*)?[A-Z\s\&\-\:\,]{4,}(\*\*|\:)?$/.test(trimmed) || 
+                                         (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.includes(': '));
+
+                        if (isHeader) {
+                          const titleText = trimmed.replace(/[\*\#]/g, '').trim();
+                          return (
+                            <div key={idx} style={{ marginTop: '20px', marginBottom: '8px', color: '#38bdf8', fontWeight: 800, fontSize: '14px', letterSpacing: '0.8px', borderBottom: '1px solid #1e293b', paddingBottom: '4px' }}>
+                              {titleText}
+                            </div>
+                          );
+                        }
+
+                        // Line containing bold key-value (e.g. 1. **Location**: Left MCA)
+                        if (trimmed.includes('**')) {
+                          const formattedParts = trimmed.split(/(\*\*.*?\*\*)/g).map((part, pIdx) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <strong key={pIdx} style={{ color: '#f8fafc', fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+                            }
+                            return part;
+                          });
+                          return (
+                            <div key={idx} style={{ marginBottom: '6px', color: '#cbd5e1' }}>
+                              {formattedParts}
+                            </div>
+                          );
+                        }
+
+                        // Bullet points or normal text
+                        return (
+                          <div key={idx} style={{ marginBottom: '6px', color: trimmed.startsWith('-') ? '#cbd5e1' : '#f8fafc' }}>
+                            {trimmed}
+                          </div>
+                        );
+                      })
                   ) : (
-                    <div style={{ color: '#64748b', fontSize: '13px' }}>No report generated yet. Run the agent to generate formal RadLex report.</div>
+                    JSON.stringify(clinicalReport, null, 2)
                   )}
                 </div>
               ) : (
-                <div>
-                  <h4 style={{ margin: '0 0 12px 0', color: '#c084fc' }}>Patient Friendly "Explain Like I'm 5" Summary</h4>
-                  {patientELI5 ? (
-                    <pre style={{ whiteSpace: 'pre-wrap', color: '#e2e8f0', fontFamily: 'system-ui, sans-serif', fontSize: '13px', lineHeight: '1.6' }}>
-                      {patientELI5}
-                    </pre>
-                  ) : (
-                    <div style={{ color: '#64748b', fontSize: '13px' }}>No patient explanation generated yet. Run the agent to generate patient summary.</div>
-                  )}
+                <div style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '60px 0' }}>
+                  No clinical report generated yet. Select a DICOM scan and click "Analyze DICOM with AI Agent".
                 </div>
               )}
             </div>
