@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production Build
+dist/
+build/
+
+# Netlify local configuration
+.netlify/
+
+# IDE & OS files
+.DS_Store
+*.local
+.env
+.env.local
+.vscode/
+.idea/

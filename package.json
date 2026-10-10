@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "netlify-cli": "^17.15.2",
     "vite": "^5.4.11"
   },
   "dependencies": {
