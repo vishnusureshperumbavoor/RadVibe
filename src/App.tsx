@@ -24,7 +24,7 @@ export default function App() {
           'Authorization': `Bearer ${apiKey.trim()}`
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3.1-70b-instruct',
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'user', content: 'Say "RadVibe Agent Connection Successful!" in 5 words.' }
           ]
