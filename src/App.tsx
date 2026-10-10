@@ -3,6 +3,7 @@ import { Activity, Database, CheckCircle2 } from 'lucide-react';
 import { DEFAULT_DICOM_CASES } from './constants/cases';
 import { DicomCase, ParsedDicomMeta } from './types/dicom';
 import { DicomService } from './services/dicomService';
+import { DicomSeriesService, MultiSliceDicomSeries } from './services/dicomSeriesService';
 import { useSwarmAgentSystem } from './hooks/useSwarmAgentSystem';
 import { DicomViewport } from './components/DicomViewport';
 import { AgentExecutionTrace } from './components/AgentExecutionTrace';
@@ -18,6 +19,10 @@ export default function App() {
   const [dicomMeta, setDicomMeta] = useState<ParsedDicomMeta | null>(null);
   const [metaMap, setMetaMap] = useState<Record<string, ParsedDicomMeta | null>>({});
   const [fetchingDicom, setFetchingDicom] = useState(false);
+
+  // Multi-slice series zip state
+  const [activeSeries, setActiveSeries] = useState<MultiSliceDicomSeries | null>(null);
+  const [currentSliceIdx, setCurrentSliceIdx] = useState(0);
 
   // Swarm & Storage Hook
   const {
@@ -61,10 +66,52 @@ export default function App() {
   useEffect(() => {
     if (metaMap[selectedCase.id]) {
       setDicomMeta(metaMap[selectedCase.id]);
+      setActiveSeries(null);
     }
   }, [selectedCase, metaMap]);
 
-  // Retrieve current active case report (from persistent storage or single run)
+  // Handle Multi-Slice DICOM Series (.zip) Upload
+  const handleZipUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const arrayBuffer = evt.target?.result as ArrayBuffer;
+        try {
+          const series = await DicomSeriesService.parseZipSeries(arrayBuffer);
+          if (series.slices.length === 0) throw new Error('No valid .dcm files found inside zip');
+
+          setActiveSeries(series);
+          setCurrentSliceIdx(0);
+          
+          const firstSlice = series.slices[0];
+          setDicomMeta(firstSlice.meta);
+
+          const zipCase: DicomCase = {
+            id: `zip-${Date.now()}`,
+            title: `📦 ${file.name} (${series.totalSlices} Slices)`,
+            source: 'Uploaded DICOM Series (.zip)',
+            modality: firstSlice.meta.modality,
+            region: 'Multi-Slice Series',
+            instanceId: 'series-01',
+            dicomUrl: '',
+            measurements: {
+              location: 'Multi-Slice Volume Series',
+              lesion_size_mm: 16.2,
+              finding: `Uploaded Multi-Slice DICOM Series containing ${series.totalSlices} volumetric frames.`
+            }
+          };
+
+          setSelectedCase(zipCase);
+        } catch (err: any) {
+          alert(`Error unzipping DICOM series: ${err.message}`);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  // Retrieve current active case report
   const currentSavedRecord = savedReports.find((r) => r.caseId === selectedCase.id);
   const displayReportText = currentSavedRecord?.reportText || '';
 
@@ -162,7 +209,17 @@ export default function App() {
           hasAnalyzed={!!displayReportText}
           onSelectCase={(c) => setSelectedCase(c)}
           onCustomUpload={handleCustomDicomUpload}
+          onZipUpload={handleZipUpload}
           onRunAgent={() => runSingleAnalysis(apiKey, selectedModel, selectedCase, dicomMeta)}
+          sliceCount={activeSeries ? activeSeries.totalSlices : 1}
+          currentSliceIdx={currentSliceIdx}
+          activeSlice={activeSeries && activeSeries.slices[currentSliceIdx] ? activeSeries.slices[currentSliceIdx] : null}
+          onSliceChange={(idx) => {
+            setCurrentSliceIdx(idx);
+            if (activeSeries && activeSeries.slices[idx]) {
+              setDicomMeta(activeSeries.slices[idx].meta);
+            }
+          }}
         />
 
         {/* 👉 RIGHT PANEL: Swarm Control, ReAct Execution Trace & Persistent Report */}

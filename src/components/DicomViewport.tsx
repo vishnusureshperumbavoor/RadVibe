@@ -12,7 +12,12 @@ interface DicomViewportProps {
   hasAnalyzed: boolean;
   onSelectCase: (c: DicomCase) => void;
   onCustomUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onZipUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRunAgent: () => void;
+  sliceCount?: number;
+  currentSliceIdx?: number;
+  onSliceChange?: (idx: number) => void;
+  activeSlice?: { byteArray: Uint8Array; meta: ParsedDicomMeta } | null;
 }
 
 export const DicomViewport: React.FC<DicomViewportProps> = ({
@@ -24,16 +29,25 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
   hasAnalyzed,
   onSelectCase,
   onCustomUpload,
-  onRunAgent
+  onZipUpload,
+  onRunAgent,
+  sliceCount = 1,
+  currentSliceIdx = 0,
+  onSliceChange,
+  activeSlice
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Re-render DICOM canvas when selectedCase, dicomMeta, or hasAnalyzed updates
+  // Re-render DICOM canvas when selectedCase, activeSlice, dicomMeta, or hasAnalyzed updates
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
-      if (selectedCase.dicomUrl) {
+      if (activeSlice) {
+        if (isMounted && canvasRef.current) {
+          DicomService.renderToCanvas(canvasRef.current, activeSlice.byteArray, activeSlice.meta, selectedCase.measurements.lesion_size_mm || 18.5, hasAnalyzed);
+        }
+      } else if (selectedCase.dicomUrl) {
         try {
           const { byteArray, meta } = await DicomService.fetchAndParse(selectedCase.dicomUrl, selectedCase.modality, selectedCase.region);
           if (isMounted && canvasRef.current) {
@@ -48,7 +62,7 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
     load();
 
     return () => { isMounted = false; };
-  }, [selectedCase, hasAnalyzed]);
+  }, [selectedCase, activeSlice, hasAnalyzed]);
 
   return (
     <section style={{ background: '#111827', borderRadius: '12px', border: '1px solid #1f2937', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -89,25 +103,59 @@ export const DicomViewport: React.FC<DicomViewportProps> = ({
         ))}
 
         {/* Custom DICOM (.dcm) Upload */}
-        <label style={{
-          marginTop: '4px',
-          padding: '10px',
-          borderRadius: '8px',
-          border: '1px dashed #4b5563',
-          background: '#1f293755',
-          color: '#9ca3af',
-          fontSize: '12px',
-          textAlign: 'center',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }}>
-          <Upload size={14} /> Upload Local .dcm File
-          <input type="file" accept=".dcm" onChange={onCustomUpload} style={{ display: 'none' }} />
-        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
+          <label style={{
+            padding: '10px',
+            borderRadius: '8px',
+            border: '1px dashed #4b5563',
+            background: '#1f293755',
+            color: '#9ca3af',
+            fontSize: '11px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}>
+            <Upload size={13} /> Single .dcm
+            <input type="file" accept=".dcm" onChange={onCustomUpload} style={{ display: 'none' }} />
+          </label>
+
+          <label style={{
+            padding: '10px',
+            borderRadius: '8px',
+            border: '1px dashed #7c3aed',
+            background: '#7c3aed11',
+            color: '#c084fc',
+            fontSize: '11px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}>
+            <Upload size={13} /> Multi-Slice Series (.zip)
+            <input type="file" accept=".zip" onChange={onZipUpload} style={{ display: 'none' }} />
+          </label>
+        </div>
       </div>
+
+      {/* Slice Navigation Slider for Multi-Slice Series */}
+      {sliceCount > 1 && (
+        <div style={{ background: '#020617', padding: '10px 14px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '11px', color: '#a78bfa', fontWeight: 600 }}>Slice {currentSliceIdx + 1} / {sliceCount}</span>
+          <input 
+            type="range" 
+            min={0} 
+            max={sliceCount - 1} 
+            value={currentSliceIdx} 
+            onChange={(e) => onSliceChange?.(parseInt(e.target.value))}
+            style={{ flex: 1, accentColor: '#7c3aed' }}
+          />
+        </div>
+      )}
 
       {/* 🖼️ Canvas rendering DICOM Pixel Array */}
       <div style={{ position: 'relative', width: '100%', height: '320px', background: '#020617', borderRadius: '10px', border: '1px solid #1e293b', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

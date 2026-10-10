@@ -7,26 +7,38 @@ export class RouterPlusService {
   private static API_URL = 'https://api.routerplus.com/v1/chat/completions';
 
   /**
-   * Synthesize diagnostic report using RouterPlus Gateway
+   * Synthesize diagnostic report using RouterPlus Gateway with Volumetric Multi-Slice Series Context
    */
-  static async synthesizeReport(apiKey: string, model: string, selectedCase: DicomCase, dicomMeta: ParsedDicomMeta | null): Promise<string> {
-    const systemPrompt = `You are RadVibe, an Autonomous Board-Certified Radiology AI Agent.
-You are analyzing a raw DICOM scan file (${selectedCase.modality} of ${selectedCase.region}).
-Extracted DICOM Header Tags: ${JSON.stringify(dicomMeta)}.
-Quantitative Measurements: ${JSON.stringify(selectedCase.measurements)}.
+  static async synthesizeReport(
+    apiKey: string, 
+    model: string, 
+    selectedCase: DicomCase, 
+    dicomMeta: ParsedDicomMeta | null,
+    totalSlices: number = 1,
+    currentSliceIdx: number = 0
+  ): Promise<string> {
+    const seriesContext = totalSlices > 1 
+      ? `Volumetric Multi-Slice Series consisting of ${totalSlices} slices. Currently inspecting Frame ${currentSliceIdx + 1}/${totalSlices}.`
+      : 'Single Slice DICOM Instance.';
 
-Generate a formal hospital Radiology Consultation Report.
+    const systemPrompt = `You are RadVibe, an Autonomous Board-Certified Radiology AI Agent.
+You are analyzing a DICOM scan (${selectedCase.modality} of ${selectedCase.region}).
+Series Acquisition Context: ${seriesContext}
+Extracted DICOM Header Tags: ${JSON.stringify(dicomMeta)}.
+Quantitative Volumetric Measurements: ${JSON.stringify(selectedCase.measurements)}.
+
+Generate a formal hospital Radiology Consultation Report covering the full volumetric series.
 DO NOT use markdown hashtags (like ### or ##). 
 Use uppercase bold headers for each section:
 
 **CLINICAL HISTORY & TECHNIQUE**
-State patient modality, region, and acquisition protocol.
+State patient modality, region, total series slice count (${totalSlices}), and acquisition protocol.
 
 **FINDINGS**
-Provide itemized anatomical findings, lesion diameter in mm, attenuation (HU), and signal characteristics.
+Provide itemized anatomical findings across the volumetric series, primary lesion diameter in mm, attenuation (HU), and slice/level distribution.
 
 **IMPRESSION**
-Primary clinical diagnostic impression.
+Primary clinical diagnostic impression derived from the multi-slice scan data.
 
 **ICD-10 CODES**
 List 2-3 relevant ICD-10 diagnostic codes.
