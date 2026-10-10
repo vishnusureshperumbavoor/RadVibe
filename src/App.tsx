@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, Database, CheckCircle2 } from 'lucide-react';
 import { DEFAULT_DICOM_CASES } from './constants/cases';
 import { DicomCase, ParsedDicomMeta } from './types/dicom';
 import { DicomService } from './services/dicomService';
-import { useRadVibeAgent } from './hooks/useRadVibeAgent';
+import { useSwarmAgentSystem } from './hooks/useSwarmAgentSystem';
 import { DicomViewport } from './components/DicomViewport';
 import { AgentExecutionTrace } from './components/AgentExecutionTrace';
 import { RadiologyReportCard } from './components/RadiologyReportCard';
+import { SwarmControlPanel } from './components/SwarmControlPanel';
 
 export default function App() {
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('radvibe_api_key') || '');
@@ -15,33 +16,57 @@ export default function App() {
   // Selected DICOM Case & Canvas State
   const [selectedCase, setSelectedCase] = useState<DicomCase>(DEFAULT_DICOM_CASES[0]);
   const [dicomMeta, setDicomMeta] = useState<ParsedDicomMeta | null>(null);
+  const [metaMap, setMetaMap] = useState<Record<string, ParsedDicomMeta | null>>({});
   const [fetchingDicom, setFetchingDicom] = useState(false);
 
-  // Custom Agent Hook
-  const { agentRunning, agentLogs, clinicalReport, runAgent } = useRadVibeAgent();
+  // Swarm & Storage Hook
+  const {
+    swarmState,
+    isSwarmRunning,
+    agentLogs,
+    savedReports,
+    runSingleAnalysis,
+    runBatchSwarm,
+    clearSavedReports
+  } = useSwarmAgentSystem();
 
   // Persist API key
   useEffect(() => {
     if (apiKey) localStorage.setItem('radvibe_api_key', apiKey);
   }, [apiKey]);
 
-  // Load DICOM header tags when selectedCase changes
+  // Load DICOM meta for default cases
   useEffect(() => {
-    async function loadMeta() {
-      if (selectedCase.dicomUrl) {
-        setFetchingDicom(true);
-        try {
-          const { meta } = await DicomService.fetchAndParse(selectedCase.dicomUrl, selectedCase.modality, selectedCase.region);
-          setDicomMeta(meta);
-        } catch (err) {
-          console.error('Error fetching DICOM meta:', err);
-        } finally {
-          setFetchingDicom(false);
+    async function loadAllMeta() {
+      const newMetaMap: Record<string, ParsedDicomMeta | null> = {};
+      for (const c of DEFAULT_DICOM_CASES) {
+        if (c.dicomUrl) {
+          try {
+            const { meta } = await DicomService.fetchAndParse(c.dicomUrl, c.modality, c.region);
+            newMetaMap[c.id] = meta;
+          } catch (err) {
+            console.error('Error fetching meta for', c.id, err);
+          }
         }
       }
+      setMetaMap(newMetaMap);
+      if (newMetaMap[selectedCase.id]) {
+        setDicomMeta(newMetaMap[selectedCase.id]);
+      }
     }
-    loadMeta();
-  }, [selectedCase]);
+    loadAllMeta();
+  }, []);
+
+  // Update active dicomMeta on case switch
+  useEffect(() => {
+    if (metaMap[selectedCase.id]) {
+      setDicomMeta(metaMap[selectedCase.id]);
+    }
+  }, [selectedCase, metaMap]);
+
+  // Retrieve current active case report (from persistent storage or single run)
+  const currentSavedRecord = savedReports.find((r) => r.caseId === selectedCase.id);
+  const displayReportText = currentSavedRecord?.reportText || '';
 
   // Custom User DICOM (.dcm) Upload
   const handleCustomDicomUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,7 +82,7 @@ export default function App() {
           setDicomMeta(meta);
 
           const customCase: DicomCase = {
-            id: 'custom-dcm-upload',
+            id: `custom-${Date.now()}`,
             title: `📁 Custom Upload: ${file.name}`,
             source: 'User Laptop (.dcm)',
             modality: meta.modality,
@@ -90,9 +115,9 @@ export default function App() {
           </div>
           <div>
             <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              RadVibe <span style={{ fontSize: '11px', background: '#2563eb22', color: '#60a5fa', padding: '2px 8px', borderRadius: '12px', border: '1px solid #2563eb44' }}>DICOM AI Agent</span>
+              RadVibe <span style={{ fontSize: '11px', background: '#7c3aed22', color: '#c084fc', padding: '2px 8px', borderRadius: '12px', border: '1px solid #7c3aed44' }}>Agent Swarm & Persistent Storage</span>
             </h1>
-            <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Direct DICOM (.dcm) Binary Parsing & RouterPlus Agent Analysis</p>
+            <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>Multi-Dataset Autonomous Swarm Analysis & Persistent Browser Storage</p>
           </div>
         </div>
 
@@ -110,7 +135,7 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>RouterPlus Model:</label>
+            <label style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600 }}>Default Model:</label>
             <select 
               value={selectedModel} 
               onChange={(e) => setSelectedModel(e.target.value)}
@@ -133,22 +158,31 @@ export default function App() {
           selectedCase={selectedCase}
           dicomMeta={dicomMeta}
           fetchingDicom={fetchingDicom}
-          agentRunning={agentRunning}
-          hasAnalyzed={!!clinicalReport}
+          agentRunning={isSwarmRunning}
+          hasAnalyzed={!!displayReportText}
           onSelectCase={(c) => setSelectedCase(c)}
           onCustomUpload={handleCustomDicomUpload}
-          onRunAgent={() => runAgent(apiKey, selectedModel, selectedCase, dicomMeta)}
+          onRunAgent={() => runSingleAnalysis(apiKey, selectedModel, selectedCase, dicomMeta)}
         />
 
-        {/* 👉 RIGHT PANEL: ReAct Agent Terminal & Radiology Report */}
+        {/* 👉 RIGHT PANEL: Swarm Control, ReAct Execution Trace & Persistent Report */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
+          {/* Swarm Control Panel & Batch Runner */}
+          <SwarmControlPanel
+            swarmState={swarmState}
+            isSwarmRunning={isSwarmRunning}
+            savedReports={savedReports}
+            onRunBatchSwarm={() => runBatchSwarm(apiKey, DEFAULT_DICOM_CASES, metaMap)}
+            onClearReports={clearSavedReports}
+          />
+
           {/* ReAct Execution Log Terminal */}
-          <AgentExecutionTrace logs={agentLogs} running={agentRunning} />
+          <AgentExecutionTrace logs={agentLogs} running={isSwarmRunning} />
 
           {/* Official Hospital EHR Radiology Document */}
           <RadiologyReportCard
-            report={clinicalReport}
+            report={displayReportText}
             selectedCase={selectedCase}
             dicomMeta={dicomMeta}
           />

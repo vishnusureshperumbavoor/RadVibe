@@ -36,6 +36,27 @@ export interface ParsedDicomMeta {
   fileSizeKB: number;
 }
 
+export interface ReportRecord {
+  id: string;
+  caseId: string;
+  caseTitle: string;
+  modality: string;
+  region: string;
+  reportText: string;
+  agentRole: string;
+  timestamp: string;
+  model: string;
+}
+
+export interface SwarmAgentState {
+  id: string;
+  name: string;
+  role: string;
+  status: 'idle' | 'analyzing' | 'completed' | 'error';
+  currentCaseId?: string;
+  model: string;
+}
+
 export interface AgentLog {
   step: string;
   detail: string;
